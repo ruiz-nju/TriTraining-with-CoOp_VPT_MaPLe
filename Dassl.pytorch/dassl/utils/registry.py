@@ -1,6 +1,7 @@
 """
 Modified from https://github.com/facebookresearch/fvcore
 """
+
 __all__ = ["Registry"]
 
 

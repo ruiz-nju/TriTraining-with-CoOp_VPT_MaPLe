@@ -149,15 +149,15 @@ def main(args):
         torch.backends.cudnn.benchmark = True
 
     print("----------Build up CoOp----------")
-    print(f"Config of CoOp:\n{cfg['CoOp']}")
+    # print(f"Config of CoOp:\n{cfg['CoOp']}")
     coop = build_trainer(cfg["CoOp"])
 
     print("----------Build up VPT----------")
-    print(f"Config of VPT:\n{cfg['VPT']}")
+    # print(f"Config of VPT:\n{cfg['VPT']}")
     vpt = build_trainer(cfg["VPT"])
 
     print("----------Build up MaPLe----------")
-    print(f"Config of MaPLe:\n{cfg['MaPLe']}")
+    # print(f"Config of MaPLe:\n{cfg['MaPLe']}")
     maple = build_trainer(cfg["MaPLe"])
 
     train_x, train_u, val, test = get_dataset(coop)

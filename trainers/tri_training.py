@@ -1,8 +1,11 @@
 import numpy as np
 import sklearn
+import torch
+import torchvision.transforms as transforms
 import pdb
 from dassl.utils import save_checkpoint
 import os.path as osp
+import random
 
 
 class Tri_Training:
@@ -10,6 +13,14 @@ class Tri_Training:
         # 初始化函数，接受三个基本分类器
         # 三个模型分别是 CoOp，VPT 和 MaPLe
         self.estimators = [base_estimator_1, base_estimator_2, base_estimator_3]
+        self.strong_tfm = [
+            transforms.RandomVerticalFlip(),
+            transforms.RandomRotation(degrees=45),
+            transforms.ColorJitter(
+                brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5
+            ),
+            transforms.RandomAffine(degrees=30, translate=(0.1, 0.1), scale=(0.8, 1.2)),
+        ]
 
     def measure_error(self, datums, j, k):
         # 计算模型 j 和模型 k 之间的错误率
@@ -22,11 +33,11 @@ class Tri_Training:
         # 打印模型 j 和模型 k 的前 10 个预测结果，方便调试
         print(f"Number of predictions: {len(y)}")
 
-        # 获取两个模型都预测错误的样本的 index
+        # 获取两个模型预测相同但都预测错误的样本的 index
         wrong_index = np.logical_and(j_pred != y, k_pred == j_pred)
 
         print(
-            f"Number of samples where model {j} and {k} are both wrong: {sum(wrong_index)}"
+            f"Number of samples where model {j} and {k} both models predict the same but both are wrong: {sum(wrong_index)}"
         )
 
         # 计算模型 j 和 k 预测一致的样本总数
@@ -48,6 +59,10 @@ class Tri_Training:
 
         return error_rate
 
+    def get_random_strong_tfm(self, num_operations=2):
+        chosen_tfm = random.sample(self.strong_tfm, num_operations)
+        return transforms.Compose(chosen_tfm)
+
     def fit(self, train_x, train_u):
         # print(len(train_x), len(train_u)) # 800 800
         # print(train_x[0]) # <dassl.data.datasets.base_dataset.Datum object at 0x75ecd4b667c0>
@@ -55,9 +70,10 @@ class Tri_Training:
 
         # 初始化每个分类器的训练，使用带放回抽样生成新的训练集
         for i in range(3):
-            sub_train_x = sklearn.utils.resample(train_x)
+            # sub_train_x = sklearn.utils.resample(train_x)
             print(f"------------Tritraining is fitting estimator: {i}------------")
-            self.estimators[i].fit(sub_train_x)
+            # self.estimators[i].fit(sub_train_x, additional_tfm=strong_aug)
+            self.estimators[i].fit(train_x, additional_tfm=self.get_random_strong_tfm())
 
         # e_prime: 用于存储每个模型的初始错误率，初始化为 0.5
         e_prime = [0.5] * 3
@@ -127,7 +143,12 @@ class Tri_Training:
                 if update[i]:
                     print(f"----------------{i} is being updated----------------")
                     # 将标记数据集与新标记的未标记样本合并，并重新训练模型
-                    self.estimators[i].fit(train_x, lb_train_u[i], lb_y[i])
+                    self.estimators[i].fit(
+                        labeled_datums=train_x,
+                        unlabeled_datums=lb_train_u[i],
+                        pseudo_labels=lb_y[i],
+                        additional_tfm=self.get_random_strong_tfm(),
+                    )
                     # 更新 e_prime 和 l_prime
                     e_prime[i] = e[i]
                     l_prime[i] = len(lb_y[i])

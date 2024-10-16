@@ -27,6 +27,7 @@ from dassl.data.transforms.transforms import build_transform
 from dassl.data.data_manager import build_data_loader
 import copy
 import pdb
+from torchvision import transforms
 
 
 class SimpleNet(nn.Module):
@@ -640,7 +641,13 @@ class TrainerX(SimpleTrainer):
 
     # 下面全是为 TriTraining 自定义的函数
     # 自定义数据的 fit
-    def fit(self, labeled_datums, unlabeled_datums=None, pseudo_labels=None):
+    def fit(
+        self,
+        labeled_datums,
+        unlabeled_datums=None,
+        pseudo_labels=None,
+        additional_tfm=None,
+    ):
         # 因为要多次调用 fit，所以需要手动设置 start_epoch 为 0
         self.start_epoch = 0
         train_dataset = labeled_datums
@@ -652,6 +659,11 @@ class TrainerX(SimpleTrainer):
             train_dataset += unlabeled_datums
         self.before_train()
         cfg = self.cfg
+        tfm = self.dm.tfm_train
+        if additional_tfm is not None:
+            # 使用 Compose 将两个 transform 组合
+            tfm = transforms.Compose([additional_tfm, tfm])
+
         dataloader = build_data_loader(
             cfg,
             sampler_type=cfg.DATALOADER.TRAIN_X.SAMPLER,
@@ -659,7 +671,7 @@ class TrainerX(SimpleTrainer):
             batch_size=cfg.DATALOADER.TRAIN_X.BATCH_SIZE,
             n_domain=cfg.DATALOADER.TRAIN_X.N_DOMAIN,
             n_ins=cfg.DATALOADER.TRAIN_X.N_INS,
-            tfm=self.dm.tfm_train,
+            tfm=tfm,
             is_train=True,
         )
         for self.epoch in range(self.start_epoch, self.max_epoch):
